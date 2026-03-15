@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Student Grade Calculator — Milestone 2</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
+
+  :root {
+    --dark-blue:    #0D1B3E;
+    --mid-blue:     #1A2F5E;
+    --light-blue:   #243a70;
+    --orange:       #FF6B00;
+    --orange-light: #FF8C3A;
+    --orange-glow:  rgba(255,107,0,0.15);
+    --white:        #FFFFFF;
+    --off-white:    #F5F7FA;
+    --gray:         #B0B8C8;
+    --gray-dim:     #6b7a99;
+    --green:        #28A745;
+    --red:          #DC3545;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Space Grotesk', sans-serif;
+    background: var(--dark-blue);
+    color: var(--white);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background mesh */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse 800px 600px at 20% 10%, rgba(255,107,0,0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 600px 800px at 80% 80%, rgba(26,47,94,0.8) 0%, transparent 70%);
+    pointer-events: none; z-index: 0;
+  }
+
+  .container { position: relative; z-index: 1; max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
+
+  /* ── HEADER ── */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 36px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid rgba(255,107,0,0.2);
+  }
+  .header-left { display: flex; align-items: center; gap: 16px; }
+  .header-icon {
+    width: 56px; height: 56px; border-radius: 14px;
+    background: linear-gradient(135deg, var(--orange), var(--orange-light));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px;
+    box-shadow: 0 0 30px rgba(255,107,0,0.4);
+  }
+  .header h1 { font-size: 28px; font-weight: 700; color: var(--white); letter-spacing: -0.5px; }
+  .header p  { color: var(--gray); font-size: 14px; margin-top: 2px; }
+  .badge {
+    background: var(--orange-glow); border: 1px solid var(--orange);
+    color: var(--orange); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+  }
+
+  /* ── STATS CARDS ── */
+  .stats-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px;
+  }
+  .stat-card {
+    background: var(--mid-blue);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 14px; padding: 20px;
+    position: relative; overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .stat-card:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,0.3); }
+  .stat-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--orange), var(--orange-light));
+  }
+  .stat-value { font-size: 32px; font-weight: 700; color: var(--orange); font-family: 'JetBrains Mono', monospace; }
+  .stat-label { font-size: 12px; color: var(--gray); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat-card.green .stat-value { color: var(--green); }
+  .stat-card.red   .stat-value { color: var(--red); }
+
+  /* ── PANEL ── */
+  .panel {
+    background: var(--mid-blue);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 16px; padding: 24px; margin-bottom: 24px;
+  }
+  .panel-title { font-size: 16px; font-weight: 600; color: var(--orange); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .panel-title::before { content: ''; display: block; width: 4px; height: 18px; background: var(--orange); border-radius: 2px; }
+
+  /* ── FORM ── */
+  .form-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 120px; }
+  .form-group label { font-size: 12px; color: var(--gray); text-transform: uppercase; letter-spacing: 0.5px; }
+  .form-group input {
+    background: var(--light-blue);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px; padding: 10px 14px;
+    color: var(--white); font-family: inherit; font-size: 14px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none;
+  }
+  .form-group input:focus {
+    border-color: var(--orange);
+    box-shadow: 0 0 0 3px rgba(255,107,0,0.15);
+  }
+  .form-group input::placeholder { color: var(--gray-dim); }
+
+  /* ── BUTTONS ── */
+  .btn {
+    padding: 10px 20px; border-radius: 8px; border: none;
+    cursor: pointer; font-family: inherit; font-size: 14px; font-weight: 600;
+    transition: all 0.2s; white-space: nowrap;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--orange), var(--orange-light));
+    color: white; box-shadow: 0 4px 15px rgba(255,107,0,0.3);
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(255,107,0,0.45); }
+  .btn-outline {
+    background: transparent; color: var(--orange-light);
+    border: 1px solid var(--orange); 
+  }
+  .btn-outline:hover { background: var(--orange-glow); }
+  .btn-ghost  { background: var(--light-blue); color: var(--gray); }
+  .btn-ghost:hover { color: var(--white); background: rgba(255,255,255,0.08); }
+  .btn-ghost.active { background: var(--orange); color: white; }
+  .btn-danger { background: var(--red); color: white; padding: 6px 12px; font-size: 12px; border-radius: 6px; }
+  .btn-danger:hover { opacity: 0.85; }
+
+  /* ── TOOLBAR ── */
+  .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+  .toolbar-sep { width: 1px; height: 28px; background: rgba(255,255,255,0.1); margin: 0 4px; }
+  .toolbar-label { font-size: 12px; color: var(--gray); }
+
+  /* ── TABLE ── */
+  .table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); }
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { background: linear-gradient(90deg, var(--orange), var(--orange-light)); }
+  thead th {
+    padding: 14px 16px; text-align: left;
+    font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.7px;
+    color: white;
+  }
+  tbody tr { transition: background 0.15s; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  tbody tr:nth-child(even) { background: rgba(26,47,94,0.5); }
+  tbody tr:hover { background: rgba(255,107,0,0.08); }
+  tbody td { padding: 13px 16px; font-size: 14px; color: var(--off-white); }
+  .td-id    { color: var(--gray); font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  .td-name  { font-weight: 500; }
+  .td-grades { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--gray); }
+  .td-avg   { font-weight: 700; color: var(--orange-light); font-family: 'JetBrains Mono', monospace; }
+  .td-grade { font-size: 20px; font-weight: 700; color: var(--orange); }
+  .badge-pass { background: rgba(40,167,69,0.15); color: var(--green); border: 1px solid var(--green); padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 700; }
+  .badge-fail { background: rgba(220,53,69,0.15); color: var(--red);   border: 1px solid var(--red);   padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 700; }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed; bottom: 32px; right: 32px;
+    background: var(--mid-blue); border: 1px solid var(--orange);
+    color: var(--white); padding: 14px 20px; border-radius: 10px;
+    font-size: 14px; box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+    transform: translateY(80px); opacity: 0;
+    transition: all 0.35s cubic-bezier(0.34,1.56,0.64,1);
+    z-index: 999;
+  }
+  #toast.show { transform: translateY(0); opacity: 1; }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+    z-index: 900; align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--mid-blue); border: 1px solid rgba(255,107,0,0.3);
+    border-radius: 16px; padding: 28px;
+    max-width: 700px; width: 90%; max-height: 80vh;
+    display: flex; flex-direction: column;
+  }
+  .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .modal-title  { font-size: 18px; font-weight: 600; color: var(--orange); }
+  .modal pre {
+    background: #0a1428; border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px; padding: 16px; overflow: auto;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--off-white);
+    flex: 1; white-space: pre-wrap; word-break: break-all;
+  }
+  .modal-actions { display: flex; gap: 10px; margin-top: 16px; justify-content: flex-end; }
+
+  /* ── GRADE BAR ── */
+  .grade-bar-wrap { margin-top: 4px; }
+  .grade-bar { height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--orange), var(--orange-light)); transition: width 0.6s ease; }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+  .stat-card  { animation: fadeIn 0.4s ease both; }
+  .stat-card:nth-child(1) { animation-delay: 0.05s; }
+  .stat-card:nth-child(2) { animation-delay: 0.10s; }
+  .stat-card:nth-child(3) { animation-delay: 0.15s; }
+  .stat-card:nth-child(4) { animation-delay: 0.20s; }
+  tbody tr { animation: fadeIn 0.3s ease both; }
+
+  .error-msg { color: #ffcc00; font-size: 13px; margin-top: 8px; display: none; }
+  .error-msg.show { display: block; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-left">
+      <div class="header-icon">📊</div>
+      <div>
+        <h1>Student Grade Calculator</h1>
+        <p>Project Milestone 2 — Functional Programming in Kotlin &amp; Dart</p>
+      </div>
+    </div>
+    <span class="badge">Milestone 2</span>
+  </header>
+
+  <!-- STATS -->
+  <div class="stats-grid" id="statsGrid">
+    <div class="stat-card"><div class="stat-value" id="statTotal">0</div><div class="stat-label">Total Students</div></div>
+    <div class="stat-card"><div class="stat-value" id="statAvg">0.00</div><div class="stat-label">Class Average</div></div>
+    <div class="stat-card green"><div class="stat-value" id="statPass">0</div><div class="stat-label">Passing</div></div>
+    <div class="stat-card red"><div class="stat-value" id="statFail">0</div><div class="stat-label">Failing</div></div>
+  </div>
+
+  <!-- ADD STUDENT -->
+  <div class="panel">
+    <div class="panel-title">Add New Student</div>
+    <div class="form-row">
+      <div class="form-group" style="max-width:130px">
+        <label>Student ID</label>
+        <input type="text" id="inpId" placeholder="STU006">
+      </div>
+      <div class="form-group" style="flex:2">
+        <label>Full Name</label>
+        <input type="text" id="inpName" placeholder="e.g. Jane Doe">
+      </div>
+      <div class="form-group" style="flex:3">
+        <label>Grades (comma-separated, 0–100)</label>
+        <input type="text" id="inpGrades" placeholder="e.g. 85, 90, 78, 92">
+      </div>
+      <button class="btn btn-primary" onclick="addStudent()">+ Add Student</button>
+    </div>
+    <div class="error-msg" id="errMsg"></div>
+  </div>
+
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+    <span class="toolbar-label">Filter:</span>
+    <button class="btn btn-ghost active" id="btnAll"     onclick="setFilter('all')">All</button>
+    <button class="btn btn-ghost"        id="btnPassing" onclick="setFilter('passing')">Passing</button>
+    <button class="btn btn-ghost"        id="btnFailing" onclick="setFilter('failing')">Failing</button>
+    <div class="toolbar-sep"></div>
+    <span class="toolbar-label">Export:</span>
+    <button class="btn btn-outline" onclick="exportHtml()">HTML</button>
+    <button class="btn btn-outline" onclick="exportXml()">XML</button>
+    <button class="btn btn-outline" onclick="exportExcel()">Excel (.xlsx)</button>
+  </div>
+
+  <!-- TABLE -->
+  <div class="table-wrap">
+    <table id="gradeTable">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Grades</th>
+          <th>Average</th>
+          <th>Letter</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modalTitle">Export Preview</span>
+      <button class="btn btn-ghost" onclick="closeModal()">✕</button>
+    </div>
+    <pre id="modalContent"></pre>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="downloadFromModal()">⬇ Download</button>
+      <button class="btn btn-ghost"   onclick="closeModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+// ╔══════════════════════════════════════════════════════╗
+// ║  Student Grade Calculator — Web GUI                 ║
+// ║  Mirrors Kotlin & Dart logic in JavaScript          ║
+// ╚══════════════════════════════════════════════════════╝
+
+// ── Data Model ───────────────────────────────────────────
+class Student {
+  constructor(id, name, grades = []) {
+    this.id     = id;
+    this.name   = name;
+    this.grades = [...grades];
+  }
+
+  // Function 1: Calculate average with validation
+  calculateAverage() {
+    if (this.grades.length === 0) return 0;
+    return this.grades.reduce((a, b) => a + b, 0) / this.grades.length;
+  }
+
+  // Function 2: Letter grade using switch-like logic (mirrors Kotlin when)
+  getLetterGrade() {
+    const avg = this.calculateAverage();
+    if (avg >= 90) return 'A';
+    if (avg >= 80) return 'B';
+    if (avg >= 70) return 'C';
+    if (avg >= 60) return 'D';
+    return 'F';
+  }
+
+  // Function 3: Pass/fail check
+  isPassing() { return this.calculateAverage() >= 60; }
+
+  // Function 4: Grade validation
+  addGrade(g) {
+    if (g >= 0 && g <= 100) { this.grades.push(g); return true; }
+    return false;
+  }
+}
+
+// ── Higher-Order Functions (mirrors Kotlin/Dart) ──────────
+const processStudents  = (students, action)    => students.forEach(action);
+const filterStudents   = (students, predicate) => students.filter(predicate);
+const mapStudents      = (students, transform) => students.map(transform);
+
+// ── State ─────────────────────────────────────────────────
+let students = [
+  new Student('STU001', 'Alice Johnson', [92, 88, 95, 91, 87]),
+  new Student('STU002', 'Bob Smith',     [74, 68, 72, 65, 70]),
+  new Student('STU003', 'Carol White',   [55, 60, 58, 52, 57]),
+  new Student('STU004', 'David Brown',   [81, 85, 79, 88, 82]),
+  new Student('STU005', 'Eva Martinez',  [98, 96, 99, 97, 95]),
+];
+let currentFilter = 'all';
+let modalType     = '';
+
+// ── Render ─────────────────────────────────────────────────
+function getDisplayed() {
+  if (currentFilter === 'passing') return filterStudents(students, s => s.isPassing());
+  if (currentFilter === 'failing') return filterStudents(students, s => !s.isPassing());
+  return students;
+}
+
+function render() {
+  const displayed = getDisplayed();
+  const tbody     = document.getElementById('tableBody');
+  tbody.innerHTML = '';
+
+  displayed.forEach((s, i) => {
+    const avg    = s.calculateAverage();
+    const letter = s.getLetterGrade();
+    const pass   = s.isPassing();
+    const tr     = document.createElement('tr');
+    tr.style.animationDelay = `${i * 0.05}s`;
+    tr.innerHTML = `
+      <td class="td-id">${escHtml(s.id)}</td>
+      <td class="td-name">${escHtml(s.name)}</td>
+      <td class="td-grades">${s.grades.map(g => Math.round(g)).join(', ')}</td>
+      <td class="td-avg">
+        ${avg.toFixed(2)}
+        <div class="grade-bar-wrap"><div class="grade-bar" style="width:${avg}%"></div></div>
+      </td>
+      <td class="td-grade">${letter}</td>
+      <td><span class="${pass ? 'badge-pass' : 'badge-fail'}">${pass ? 'PASS' : 'FAIL'}</span></td>
+      <td><button class="btn btn-danger" onclick="removeStudent('${s.id}')">Remove</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  updateStats();
+}
+
+function updateStats() {
+  const all   = students;
+  const avgs  = mapStudents(all, s => s.calculateAverage());
+  const classAvg = avgs.length ? avgs.reduce((a,b)=>a+b,0)/avgs.length : 0;
+  const passing  = filterStudents(all, s => s.isPassing()).length;
+
+  document.getElementById('statTotal').textContent = all.length;
+  document.getElementById('statAvg').textContent   = classAvg.toFixed(2);
+  document.getElementById('statPass').textContent  = passing;
+  document.getElementById('statFail').textContent  = all.length - passing;
+}
+
+// ── Actions ───────────────────────────────────────────────
+function addStudent() {
+  const id     = document.getElementById('inpId').value.trim();
+  const name   = document.getElementById('inpName').value.trim();
+  const gRaw   = document.getElementById('inpGrades').value.trim();
+  const errEl  = document.getElementById('errMsg');
+
+  if (!id || !name) {
+    errEl.textContent = '⚠ Student ID and Name are required.';
+    errEl.classList.add('show'); return;
+  }
+  if (students.find(s => s.id === id)) {
+    errEl.textContent = '⚠ A student with this ID already exists.';
+    errEl.classList.add('show'); return;
+  }
+
+  const grades = gRaw ? gRaw.split(',')
+    .map(g => parseFloat(g.trim()))
+    .filter(g => !isNaN(g) && g >= 0 && g <= 100) : [];
+
+  const s = new Student(id, name, grades);
+  students.push(s);
+
+  errEl.classList.remove('show');
+  document.getElementById('inpId').value     = '';
+  document.getElementById('inpName').value   = '';
+  document.getElementById('inpGrades').value = '';
+  render();
+  toast(`✓ ${name} added successfully.`);
+}
+
+function removeStudent(id) {
+  const s = students.find(s => s.id === id);
+  students = students.filter(s => s.id !== id);
+  render();
+  toast(`Removed ${s?.name ?? id}.`);
+}
+
+function setFilter(f) {
+  currentFilter = f;
+  ['all','passing','failing'].forEach(x => {
+    const el = document.getElementById('btn' + x.charAt(0).toUpperCase() + x.slice(1));
+    if (el) el.classList.toggle('active', x === f);
+  });
+  render();
+}
+
+// ── Export ────────────────────────────────────────────────
+function exportHtml() {
+  const rows = students.map(s => {
+    const c = s.isPassing() ? '#28a745' : '#dc3545';
+    return `<tr>
+      <td>${escHtml(s.id)}</td><td>${escHtml(s.name)}</td>
+      <td>${s.grades.map(g=>Math.round(g)).join(', ')}</td>
+      <td>${s.calculateAverage().toFixed(2)}</td>
+      <td style="color:${c};font-weight:bold">${s.getLetterGrade()}</td>
+      <td style="color:${c}">${s.isPassing()?'PASS':'FAIL'}</td>
+    </tr>`;
+  }).join('\n');
+
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Grade Report</title>
+<style>
+  body{font-family:Segoe UI,sans-serif;background:#0D1B3E;color:#fff;margin:40px}
+  h1{color:#FF6B00;margin-bottom:24px}
+  table{border-collapse:collapse;width:100%}
+  th{background:#FF6B00;color:#fff;padding:12px 16px;text-align:left}
+  td{background:#1A2F5E;color:#fff;padding:10px 16px;border-bottom:1px solid #243a70}
+  tr:hover td{background:#243a70}
+</style></head><body>
+<h1>&#128202; Student Grade Report</h1>
+<table><tr><th>ID</th><th>Name</th><th>Grades</th><th>Average</th><th>Letter</th><th>Status</th></tr>
+${rows}</table></body></html>`;
+
+  showModal('HTML Export', html, 'html');
+}
+
+function exportXml() {
+  const rows = students.map(s => `  <student id="${escHtml(s.id)}">
+    <name>${escHtml(s.name)}</name>
+    <grades>${s.grades.join(',')}</grades>
+    <average>${s.calculateAverage().toFixed(2)}</average>
+    <letterGrade>${s.getLetterGrade()}</letterGrade>
+    <status>${s.isPassing()?'PASS':'FAIL'}</status>
+  </student>`).join('\n');
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<students>\n${rows}\n</students>`;
+  showModal('XML Export', xml, 'xml');
+}
+
+function exportExcel() {
+  const wsData = [['ID','Name','Grades','Average','Letter Grade','Status']];
+  students.forEach(s => wsData.push([
+    s.id, s.name,
+    s.grades.join(', '),
+    parseFloat(s.calculateAverage().toFixed(2)),
+    s.getLetterGrade(),
+    s.isPassing()?'PASS':'FAIL'
+  ]));
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+  // Column widths
+  ws['!cols'] = [12,22,30,12,14,10].map(w=>({wch:w}));
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Grade Report');
+  XLSX.writeFile(wb, 'StudentGradeReport.xlsx');
+  toast('✓ Excel file downloaded!');
+}
+
+// ── Modal ─────────────────────────────────────────────────
+let _modalContent = '';
+let _modalExt     = '';
+
+function showModal(title, content, ext) {
+  _modalContent = content;
+  _modalExt     = ext;
+  document.getElementById('modalTitle').textContent   = title;
+  document.getElementById('modalContent').textContent = content;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+
+function downloadFromModal() {
+  const blob = new Blob([_modalContent], {
+    type: _modalExt === 'html' ? 'text/html' : 'application/xml'
+  });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `StudentGradeReport.${_modalExt}`;
+  a.click();
+  toast(`✓ ${_modalExt.toUpperCase()} file downloaded!`);
+  closeModal();
+}
+
+// ── Toast ─────────────────────────────────────────────────
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ── Utils ─────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Init ──────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>
